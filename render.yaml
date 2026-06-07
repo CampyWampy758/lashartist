@@ -1,0 +1,33 @@
+# Deploy the Express API on Render (separate from Netlify frontends).
+# Dashboard: New → Blueprint → connect this repo, or create a Web Service manually.
+services:
+  - type: web
+    name: liyelle-atelier-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_URL
+        sync: false
+      - key: ADMIN_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: STUDIO_EMAIL
+        sync: false
+    disk:
+      name: liyelle-uploads
+      mountPath: uploads
+      sizeGB: 1
