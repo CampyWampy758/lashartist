@@ -1,7 +1,5 @@
 import { Router } from "express";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import { readDepositProof } from "../utils/depositStorage.js";
 import { adminAuth } from "../middleware/adminAuth.js";
 import { TIME_SLOTS } from "../data/constants.js";
 import { readBookings, updateBooking, findBooking } from "../utils/storage.js";
@@ -28,9 +26,6 @@ import {
   deleteUserAccount,
   adminSendPasswordReset,
 } from "../utils/users.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.join(__dirname, "../uploads");
 
 const router = Router();
 
@@ -84,16 +79,14 @@ router.get("/bookings/:id/deposit-proof", async (req, res) => {
       return res.status(404).json({ error: "No deposit proof on file." });
     }
 
-    const filename = path.basename(booking.depositProof);
-    const filePath = path.join(uploadsDir, filename);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "Deposit proof file not found." });
-    }
-
-    res.sendFile(filePath);
+    const { buffer, contentType } = await readDepositProof(booking.depositProof);
+    res.set("Content-Type", contentType);
+    res.send(buffer);
   } catch (err) {
     console.error(err);
+    if (err.code === "ENOENT") {
+      return res.status(404).json({ error: "Deposit proof file not found." });
+    }
     res.status(500).json({ error: "Could not load deposit proof." });
   }
 });

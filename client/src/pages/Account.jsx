@@ -10,12 +10,10 @@ import {
 
 export default function Account() {
   const navigate = useNavigate();
-  const { user, signOut, getAccessToken, loading: authLoading } = useAuth();
+  const { user, signOut, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState({ fullName: "", phone: "" });
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-
-  const token = getAccessToken();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -35,7 +33,7 @@ export default function Account() {
   async function handleSaveProfile(e) {
     e.preventDefault();
     try {
-      await updateProfile(token, profile);
+      await updateProfile(profile);
       setMessage("Profile updated.");
       setError("");
     } catch (err) {
@@ -46,7 +44,7 @@ export default function Account() {
   async function handleResetPassword() {
     if (!confirm("Send a password reset email to your account?")) return;
     try {
-      await requestPasswordReset(token);
+      await requestPasswordReset();
       setMessage("Password reset email sent.");
       setError("");
     } catch (err) {
@@ -57,7 +55,7 @@ export default function Account() {
   async function handleDeleteAccount() {
     if (!confirm("Delete your account permanently? This cannot be undone.")) return;
     try {
-      await deleteAccount(token);
+      await deleteAccount();
       await signOut();
       navigate("/");
     } catch (err) {

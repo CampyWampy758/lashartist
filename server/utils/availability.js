@@ -50,15 +50,6 @@ async function readAvailabilityFile() {
   }
 }
 
-async function writeAvailabilityFile(schedule, blockedDates) {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(
-    AVAILABILITY_FILE,
-    JSON.stringify({ schedule, blockedDates }, null, 2),
-    "utf8"
-  );
-}
-
 async function readScheduleFromSupabase() {
   const { data, error } = await supabase
     .from("availability_slots")
@@ -86,11 +77,7 @@ async function writeScheduleToSupabase(updates) {
 
 export async function getWeeklySchedule() {
   if (supabaseEnabled) {
-    try {
-      return await readScheduleFromSupabase();
-    } catch (err) {
-      console.error("Supabase availability read failed, using local file:", err.message);
-    }
+    return readScheduleFromSupabase();
   }
 
   const file = await readAvailabilityFile();
@@ -100,6 +87,11 @@ export async function getWeeklySchedule() {
 }
 
 export async function updateWeeklySchedule(updates) {
+  if (supabaseEnabled) {
+    await writeScheduleToSupabase(updates);
+    return readScheduleFromSupabase();
+  }
+
   const schedule = await getWeeklySchedule();
 
   for (const { dayOfWeek, timeSlot, isAvailable } of updates) {
@@ -110,41 +102,30 @@ export async function updateWeeklySchedule(updates) {
   }
 
   const blockedDates = await getBlockedDates();
-  await writeAvailabilityFile(schedule, blockedDates);
-
-  if (supabaseEnabled) {
-    try {
-      await writeScheduleToSupabase(updates);
-    } catch (err) {
-      console.error("Supabase availability save failed (saved locally):", err.message);
-    }
-  }
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(
+    AVAILABILITY_FILE,
+    JSON.stringify({ schedule, blockedDates }, null, 2),
+    "utf8"
+  );
 
   return schedule;
 }
 
 export async function getBlockedDates() {
   if (supabaseEnabled) {
-    try {
-      const { data, error } = await supabase
-        .from("blocked_dates")
-        .select("id, date, reason")
-        .order("date");
+    const { data, error } = await supabase
+      .from("blocked_dates")
+      .select("id, date, reason")
+      .order("date");
 
-      if (error) throw error;
+    if (error) throw error;
 
-      const blockedDates = data.map((row) => ({
-        id: row.id,
-        date: row.date,
-        reason: row.reason || "",
-      }));
-
-      const schedule = await getWeeklySchedule();
-      await writeAvailabilityFile(schedule, blockedDates);
-      return blockedDates;
-    } catch (err) {
-      console.error("Supabase blocked dates read failed, using local file:", err.message);
-    }
+    return data.map((row) => ({
+      id: row.id,
+      date: row.date,
+      reason: row.reason || "",
+    }));
   }
 
   const file = await readAvailabilityFile();
@@ -152,10 +133,6 @@ export async function getBlockedDates() {
 }
 
 export async function addBlockedDate(date, reason = "") {
-  const blockedDates = await getBlockedDates();
-  const existing = blockedDates.find((b) => b.date === date);
-  if (existing) return existing;
-
   if (supabaseEnabled) {
     const { data, error } = await supabase
       .from("blocked_dates")
@@ -163,35 +140,55 @@ export async function addBlockedDate(date, reason = "") {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === "23505") {
+        const blockedDates = await getBlockedDates();
+        return blockedDates.find((b) => b.date === date);
+      }
+      throw error;
+    }
 
-    const blocked = { id: data.id, date: data.date, reason: data.reason || "" };
-    const schedule = await getWeeklySchedule();
-    await writeAvailabilityFile(schedule, [...blockedDates, blocked]);
-    return blocked;
+    return { id: data.id, date: data.date, reason: data.reason || "" };
   }
+
+  const blockedDates = await getBlockedDates();
+  const existing = blockedDates.find((b) => b.date === date);
+  if (existing) return existing;
 
   const blocked = {
     id: `local-${Date.now()}`,
     date,
     reason: reason || "",
   };
+
   const schedule = await getWeeklySchedule();
-  await writeAvailabilityFile(schedule, [...blockedDates, blocked]);
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(
+    AVAILABILITY_FILE,
+    JSON.stringify({ schedule, blockedDates: [...blockedDates, blocked] }, null, 2),
+    "utf8"
+  );
+
   return blocked;
 }
 
 export async function removeBlockedDate(id) {
-  const blockedDates = await getBlockedDates();
-  const nextBlocked = blockedDates.filter((b) => b.id !== id);
-
   if (supabaseEnabled) {
     const { error } = await supabase.from("blocked_dates").delete().eq("id", id);
     if (error) throw error;
+    return;
   }
 
+  const blockedDates = await getBlockedDates();
+  const nextBlocked = blockedDates.filter((b) => b.id !== id);
   const schedule = await getWeeklySchedule();
-  await writeAvailabilityFile(schedule, nextBlocked);
+
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(
+    AVAILABILITY_FILE,
+    JSON.stringify({ schedule, blockedDates: nextBlocked }, null, 2),
+    "utf8"
+  );
 }
 
 export function dayOfWeekFromDate(dateStr) {

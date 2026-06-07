@@ -44,7 +44,7 @@ function buildMonthCells(year, month) {
   return cells;
 }
 
-export default function CalendarPanel({ token }) {
+export default function CalendarPanel() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -60,8 +60,8 @@ export default function CalendarPanel({ token }) {
     setError("");
     try {
       const [bookingData, availability] = await Promise.all([
-        adminFetchBookings(token, { status: "all", sort: "date_asc" }),
-        adminFetchAvailability(token),
+        adminFetchBookings({ status: "all", sort: "date_asc" }),
+        adminFetchAvailability(),
       ]);
       setBookings(bookingData);
       setSchedule(availability.schedule);
@@ -71,7 +71,7 @@ export default function CalendarPanel({ token }) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     load();

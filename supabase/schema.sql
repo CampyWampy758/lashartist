@@ -213,6 +213,10 @@ create policy "Users can update own profile"
   on public.profiles for update
   using (auth.uid() = id);
 
+create policy "Users can delete own profile"
+  on public.profiles for delete
+  using (auth.uid() = id);
+
 -- Bookings: users see own bookings; anyone can insert (guest booking)
 create policy "Users can view own bookings"
   on public.bookings for select
@@ -246,3 +250,19 @@ create policy "Anyone can read active promos"
   using (is_active = true);
 
 -- Service role bypasses RLS — the Express API uses SUPABASE_SERVICE_ROLE_KEY.
+
+-- ---------------------------------------------------------------------------
+-- Storage — deposit proof screenshots (private bucket)
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'deposit-proofs',
+  'deposit-proofs',
+  false,
+  5242880,
+  array['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
+)
+on conflict (id) do nothing;
+
+-- Only the service role (Express API) reads/writes deposit proofs.
+-- No public or authenticated-user policies — admin access goes through the API.

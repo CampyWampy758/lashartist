@@ -14,7 +14,7 @@ function minDate() {
   return d.toISOString().split("T")[0];
 }
 
-export default function AvailabilityPanel({ token }) {
+export default function AvailabilityPanel() {
   const [schedule, setSchedule] = useState({});
   const [blockedDates, setBlockedDates] = useState([]);
   const [blockForm, setBlockForm] = useState({ date: "", reason: "" });
@@ -26,7 +26,7 @@ export default function AvailabilityPanel({ token }) {
     setLoading(true);
     setError("");
     try {
-      const data = await adminFetchAvailability(token);
+      const data = await adminFetchAvailability();
       setSchedule(data.schedule);
       setBlockedDates(data.blockedDates);
     } catch (err) {
@@ -34,7 +34,7 @@ export default function AvailabilityPanel({ token }) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -65,7 +65,7 @@ export default function AvailabilityPanel({ token }) {
           });
         }
       }
-      const result = await adminUpdateSchedule(token, updates);
+      const result = await adminUpdateSchedule(updates);
       setSchedule(result.schedule);
     } catch (err) {
       setError(err.message);
@@ -78,7 +78,7 @@ export default function AvailabilityPanel({ token }) {
     e.preventDefault();
     if (!blockForm.date) return;
     try {
-      await adminAddBlockedDate(token, blockForm.date, blockForm.reason);
+      await adminAddBlockedDate(blockForm.date, blockForm.reason);
       setBlockForm({ date: "", reason: "" });
       await load();
     } catch (err) {
@@ -88,7 +88,7 @@ export default function AvailabilityPanel({ token }) {
 
   async function handleUnblock(id) {
     try {
-      await adminRemoveBlockedDate(token, id);
+      await adminRemoveBlockedDate(id);
       await load();
     } catch (err) {
       setError(err.message);

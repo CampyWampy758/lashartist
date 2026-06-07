@@ -6,26 +6,24 @@ import { fetchMyBookings, STATUS_LABELS } from "../api";
 
 export default function Appointments() {
   const navigate = useNavigate();
-  const { user, getAccessToken, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const token = getAccessToken();
-
   const loadBookings = useCallback(async () => {
-    if (!token) return;
+    if (!user) return;
     setLoading(true);
     setError("");
     try {
-      const data = await fetchMyBookings(token);
+      const data = await fetchMyBookings();
       setBookings(data);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [user]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -34,8 +32,8 @@ export default function Appointments() {
   }, [authLoading, user, navigate]);
 
   useEffect(() => {
-    if (token) loadBookings();
-  }, [token, loadBookings]);
+    if (user) loadBookings();
+  }, [user, loadBookings]);
 
   if (authLoading || !user) {
     return <div className="page centered"><p className="muted">Loading...</p></div>;

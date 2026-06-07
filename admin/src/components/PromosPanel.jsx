@@ -11,7 +11,7 @@ const EMPTY_FORM = {
   expiresAt: "",
 };
 
-export default function PromosPanel({ token }) {
+export default function PromosPanel() {
   const [promos, setPromos] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
@@ -22,13 +22,13 @@ export default function PromosPanel({ token }) {
     setLoading(true);
     setError("");
     try {
-      setPromos(await adminFetchPromos(token));
+      setPromos(await adminFetchPromos());
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -39,7 +39,7 @@ export default function PromosPanel({ token }) {
     setCreating(true);
     setError("");
     try {
-      await adminCreatePromo(token, {
+      await adminCreatePromo({
         code: form.code,
         description: form.description,
         discountType: form.discountType,
@@ -59,7 +59,7 @@ export default function PromosPanel({ token }) {
 
   async function toggleActive(promo) {
     try {
-      await adminUpdatePromo(token, promo.id, { isActive: !promo.isActive });
+      await adminUpdatePromo(promo.id, { isActive: !promo.isActive });
       await load();
     } catch (err) {
       setError(err.message);

@@ -4,7 +4,7 @@
   "private": true,
   "description": "The Liyelle Atelier — mobile-first lash studio website",
   "scripts": {
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\" \"npm run dev:admin\"",
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:admin\"",
     "dev:client": "npm run dev --prefix client",
     "dev:admin": "npm run dev --prefix admin",
     "dev:server": "npm run dev --prefix server",

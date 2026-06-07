@@ -25,7 +25,7 @@ export default function Book() {
   const location = useLocation();
   const [params] = useSearchParams();
   const preselected = params.get("service");
-  const { user, getAccessToken } = useAuth();
+  const { user } = useAuth();
 
   const [services, setServices] = useState([]);
   const [banks, setBanks] = useState([]);
@@ -144,14 +144,11 @@ export default function Book() {
     setLoading(true);
     setError("");
     try {
-      const booking = await createBooking(
-        {
-          serviceId: selected.id,
-          ...form,
-          promoCode: promoApplied ? form.promoCode : undefined,
-        },
-        getAccessToken()
-      );
+      const booking = await createBooking({
+        serviceId: selected.id,
+        ...form,
+        promoCode: promoApplied ? form.promoCode : undefined,
+      });
       navigate(`/booking/${booking.id}`);
     } catch (err) {
       setError(err.message);

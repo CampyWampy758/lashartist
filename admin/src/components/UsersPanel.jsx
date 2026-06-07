@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { adminDeleteUser, adminFetchUsers, adminResetUserPassword } from "../api";
 
-export default function UsersPanel({ token }) {
+export default function UsersPanel() {
   const [users, setUsers] = useState([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -11,13 +11,13 @@ export default function UsersPanel({ token }) {
     setLoading(true);
     setError("");
     try {
-      setUsers(await adminFetchUsers(token));
+      setUsers(await adminFetchUsers());
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -30,7 +30,7 @@ export default function UsersPanel({ token }) {
     }
     if (!confirm(`Send password reset email to ${user.email}?`)) return;
     try {
-      await adminResetUserPassword(token, user.id, user.email);
+      await adminResetUserPassword(user.email);
       setMessage(`Reset email sent to ${user.email}`);
     } catch (err) {
       setError(err.message);
@@ -40,7 +40,7 @@ export default function UsersPanel({ token }) {
   async function handleDelete(user) {
     if (!confirm(`Permanently delete ${user.fullName || user.email}? This cannot be undone.`)) return;
     try {
-      await adminDeleteUser(token, user.id);
+      await adminDeleteUser(user.id);
       setMessage("User deleted.");
       await load();
     } catch (err) {

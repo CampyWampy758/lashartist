@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import {
   adminFetchBookings,
   adminFetchStats,
+  adminGetSession,
+  adminSignIn,
+  adminSignOut,
   adminUpdateBooking,
   formatEC,
   STATUS_LABELS,
@@ -13,8 +16,6 @@ import CalendarPanel from "./components/CalendarPanel";
 import PromosPanel from "./components/PromosPanel";
 import UsersPanel from "./components/UsersPanel";
 import "./App.css";
-
-const TOKEN_KEY = "liyelle_admin_token";
 
 const FILTERS = [
   { id: "deposit_submitted", label: "Needs review" },
@@ -41,7 +42,9 @@ function minDate() {
 }
 
 export default function App() {
-  const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY) || "");
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [section, setSection] = useState("bookings");
   const [bookings, setBookings] = useState([]);
@@ -55,21 +58,26 @@ export default function App() {
   const [expanded, setExpanded] = useState(null);
   const [reschedule, setReschedule] = useState({});
 
-  const loadData = useCallback(async (authToken) => {
+  useEffect(() => {
+    adminGetSession()
+      .then(setSession)
+      .finally(() => setAuthLoading(false));
+  }, []);
+
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const [bookingData, statsData] = await Promise.all([
-        adminFetchBookings(authToken, { status: filter, search, sort }),
-        adminFetchStats(authToken),
+        adminFetchBookings({ status: filter, search, sort }),
+        adminFetchStats(),
       ]);
       setBookings(bookingData);
       setStats(statsData);
     } catch (err) {
       setError(err.message);
-      if (err.message === "Unauthorized") {
-        sessionStorage.removeItem(TOKEN_KEY);
-        setToken("");
+      if (err.message.includes("Sign in") || err.message.includes("Admin access")) {
+        setSession(null);
       }
     } finally {
       setLoading(false);
@@ -77,31 +85,36 @@ export default function App() {
   }, [filter, search, sort]);
 
   useEffect(() => {
-    if (token && section === "bookings") loadData(token);
-  }, [token, section, loadData]);
+    if (session && section === "bookings") loadData();
+  }, [session, section, loadData]);
 
-  function handleLogin(e) {
+  async function handleLogin(e) {
     e.preventDefault();
-    if (!password.trim()) return;
-    sessionStorage.setItem(TOKEN_KEY, password.trim());
-    setToken(password.trim());
-    setPassword("");
+    setError("");
+    try {
+      await adminSignIn(email.trim(), password);
+      const next = await adminGetSession();
+      setSession(next);
+      setPassword("");
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
-  function logout() {
-    sessionStorage.removeItem(TOKEN_KEY);
-    setToken("");
+  async function logout() {
+    await adminSignOut();
+    setSession(null);
     setBookings([]);
     setStats(null);
   }
 
   async function review(id, status) {
     try {
-      await adminUpdateBooking(token, id, {
+      await adminUpdateBooking(id, {
         status,
         adminNotes: notes[id] || "",
       });
-      await loadData(token);
+      await loadData();
     } catch (err) {
       setError(err.message);
     }
@@ -110,8 +123,8 @@ export default function App() {
   async function cancelBooking(id) {
     if (!confirm("Cancel this booking?")) return;
     try {
-      await adminUpdateBooking(token, id, { status: "cancelled" });
-      await loadData(token);
+      await adminUpdateBooking(id, { status: "cancelled" });
+      await loadData();
     } catch (err) {
       setError(err.message);
     }
@@ -124,13 +137,13 @@ export default function App() {
       return;
     }
     try {
-      await adminUpdateBooking(token, id, {
+      await adminUpdateBooking(id, {
         date: data.date,
         time: data.time,
         adminNotes: notes[id] || "",
       });
       setReschedule((prev) => ({ ...prev, [id]: undefined }));
-      await loadData(token);
+      await loadData();
     } catch (err) {
       setError(err.message);
     }
@@ -138,21 +151,42 @@ export default function App() {
 
   async function saveNotes(id) {
     try {
-      await adminUpdateBooking(token, id, { adminNotes: notes[id] || "" });
-      await loadData(token);
+      await adminUpdateBooking(id, { adminNotes: notes[id] || "" });
+      await loadData();
     } catch (err) {
       setError(err.message);
     }
   }
 
-  if (!token) {
+  if (authLoading) {
+    return (
+      <div className="admin-shell">
+        <div className="login-panel">
+          <p className="muted">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
     return (
       <div className="admin-shell">
         <div className="login-panel">
           <p className="eyebrow">Staff portal</p>
           <h1>Liyelle Admin</h1>
-          <p className="muted">Review deposits and manage salon bookings.</p>
+          <p className="muted">Sign in with your admin Supabase account.</p>
           <form className="login-form" onSubmit={handleLogin}>
+            <label>
+              Email
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
+                placeholder="admin@example.com"
+                required
+              />
+            </label>
             <label>
               Password
               <input
@@ -160,7 +194,8 @@ export default function App() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
-                placeholder="Enter admin password"
+                placeholder="Your password"
+                required
               />
             </label>
             {error && <p className="form-error">{error}</p>}
@@ -180,7 +215,7 @@ export default function App() {
         </div>
         <div className="header-actions">
           {section === "bookings" && (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => loadData(token)} disabled={loading}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={loadData} disabled={loading}>
               Refresh
             </button>
           )}
@@ -313,7 +348,7 @@ export default function App() {
                       </dl>
 
                       {booking.depositProof && (
-                        <DepositProof token={token} bookingId={booking.id} />
+                        <DepositProof bookingId={booking.id} />
                       )}
 
                       <div className="notes-block">
@@ -392,10 +427,10 @@ export default function App() {
         </>
       )}
 
-      {section === "calendar" && <CalendarPanel token={token} />}
-      {section === "availability" && <AvailabilityPanel token={token} />}
-      {section === "promos" && <PromosPanel token={token} />}
-      {section === "users" && <UsersPanel token={token} />}
+      {section === "calendar" && <CalendarPanel />}
+      {section === "availability" && <AvailabilityPanel />}
+      {section === "promos" && <PromosPanel />}
+      {section === "users" && <UsersPanel />}
     </div>
   );
 }

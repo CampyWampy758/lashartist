@@ -1,28 +1,20 @@
 import { useEffect, useState } from "react";
-import { adminFetchDepositProof } from "../api";
+import { adminFetchDepositProofUrl } from "../api";
 
-export default function DepositProof({ token, bookingId }) {
+export default function DepositProof({ bookingId }) {
   const [url, setUrl] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let objectUrl = null;
     setLoading(true);
     setError("");
 
-    adminFetchDepositProof(token, bookingId)
-      .then((blob) => {
-        objectUrl = URL.createObjectURL(blob);
-        setUrl(objectUrl);
-      })
+    adminFetchDepositProofUrl(bookingId)
+      .then(setUrl)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [token, bookingId]);
+  }, [bookingId]);
 
   if (loading) return <p className="muted">Loading screenshot...</p>;
   if (error) return <p className="form-error">{error}</p>;

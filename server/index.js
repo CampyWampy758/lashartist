@@ -12,6 +12,8 @@ import promoRoutes from "./routes/promos.js";
 import accountRoutes from "./routes/account.js";
 import { adminMailEnabled } from "./utils/adminMail.js";
 import { clientMailEnabled } from "./utils/clientMail.js";
+import { supabaseEnabled, supabase } from "./utils/supabase.js";
+import { DEPOSIT_BUCKET } from "./utils/depositStorage.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -42,8 +44,26 @@ app.use(
 app.use(express.json());
 app.use("/uploads", express.static(uploadsDir));
 
-app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, name: "The Liyelle Atelier API" });
+app.get("/api/health", async (_req, res) => {
+  const health = {
+    ok: true,
+    name: "The Liyelle Atelier API",
+    supabase: supabaseEnabled,
+    storage: supabaseEnabled ? DEPOSIT_BUCKET : "local-disk",
+  };
+
+  if (supabaseEnabled) {
+    try {
+      const { error } = await supabase.from("bookings").select("id").limit(1);
+      health.database = error ? "error" : "connected";
+      if (error) health.databaseError = error.message;
+    } catch (err) {
+      health.database = "error";
+      health.databaseError = err.message;
+    }
+  }
+
+  res.json(health);
 });
 
 app.use("/api", configRoutes);
@@ -73,6 +93,11 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`Public API + site: http://localhost:${PORT}`);
+  console.log(
+    supabaseEnabled
+      ? "Database: Supabase (Postgres + Storage for deposit proofs)"
+      : "Database: local JSON files (set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY for production)"
+  );
   console.log(
     adminMailEnabled
       ? "Admin email alerts: enabled"

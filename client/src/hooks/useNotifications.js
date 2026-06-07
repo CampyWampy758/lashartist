@@ -7,27 +7,25 @@ import {
 } from "../api";
 
 export function useNotifications() {
-  const { getAccessToken } = useAuth();
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const token = getAccessToken();
-
   const refresh = useCallback(async () => {
-    if (!token) {
+    if (!user) {
       setNotifications([]);
       return;
     }
     setLoading(true);
     try {
-      const data = await fetchNotifications(token);
+      const data = await fetchNotifications();
       setNotifications(data);
     } catch {
       setNotifications([]);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [user]);
 
   useEffect(() => {
     refresh();
@@ -35,22 +33,19 @@ export function useNotifications() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const markRead = useCallback(
-    async (id) => {
-      if (!token) return;
-      await markNotificationRead(token, id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-      );
-    },
-    [token]
-  );
+  const markRead = useCallback(async (id) => {
+    if (!user) return;
+    await markNotificationRead(id);
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  }, [user]);
 
   const markAllRead = useCallback(async () => {
-    if (!token) return;
-    await markAllNotificationsRead(token);
+    if (!user) return;
+    await markAllNotificationsRead();
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, [token]);
+  }, [user]);
 
   return { notifications, unreadCount, loading, refresh, markRead, markAllRead };
 }

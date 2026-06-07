@@ -1,8 +1,6 @@
 import { Router } from "express";
-import multer from "multer";
-import path from "path";
-import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from "uuid";
+import { depositUpload, saveDepositProof } from "../utils/depositStorage.js";
 import { TIME_SLOTS } from "../data/constants.js";
 import { services } from "../data/services.js";
 import { banks } from "../data/banks.js";
@@ -25,29 +23,6 @@ import {
 import { notifyAdminBooking } from "../utils/adminMail.js";
 import { notifyClientBooking } from "../utils/clientMail.js";
 import { notifyBookingUpdate } from "../utils/notifications.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.join(__dirname, "../uploads");
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || ".jpg";
-    cb(null, `${Date.now()}-${uuidv4()}${ext}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (/^image\/(jpeg|jpg|png|webp|heic|heif)$/i.test(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only image files are allowed."));
-    }
-  },
-});
 
 const router = Router();
 
@@ -212,7 +187,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/:id/deposit-proof", upload.single("proof"), async (req, res) => {
+router.post("/:id/deposit-proof", depositUpload.single("proof"), async (req, res) => {
   try {
     await expireStaleBookings();
     const booking = await findBooking(req.params.id);
@@ -237,9 +212,11 @@ router.post("/:id/deposit-proof", upload.single("proof"), async (req, res) => {
       return res.status(400).json({ error: "Please upload a transfer screenshot." });
     }
 
+    const depositProof = await saveDepositProof(booking.id, req.file);
+
     const updated = await updateBooking(booking.id, {
       status: "deposit_submitted",
-      depositProof: `/uploads/${req.file.filename}`,
+      depositProof,
       depositSubmittedAt: new Date().toISOString(),
     });
 
